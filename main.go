@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	compute.ListInstances(zones.UsEast5a)
+	compute.InsertInstance(zones.UsEast5a)
 }

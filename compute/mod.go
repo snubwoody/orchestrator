@@ -11,6 +11,73 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+func DeleteInstance() {
+
+}
+
+func InsertInstance(zone string) {
+	ctx := context.Background()
+
+	client, err := compute.NewInstancesRESTClient(ctx)
+	if err != nil {
+		fmt.Printf("NewInstancesRESTClient error: %s", err)
+	}
+
+	defer client.Close()
+
+	instanceName := "my-instance"
+	machineType := fmt.Sprintf("zones/%s/machineTypes/e2-micro", zone)
+	autoDelete := true
+	boot := true
+	diskType := "PERSISTENT"
+	diskImage := "projects/debian-cloud/global/images/family/debian-11"
+	// 10Gb is the minimum size
+	var diskSize int64 = 10
+
+	disk := &computepb.AttachedDisk{
+		AutoDelete: &autoDelete,
+		Boot:       &boot,
+		Type:       &diskType,
+		InitializeParams: &computepb.AttachedDiskInitializeParams{
+			SourceImage: &diskImage,
+			DiskSizeGb:  &diskSize,
+		},
+	}
+
+	networkType := "ONE_TO_ONE_NAT"
+	networkName := "External NAT"
+	network := "global/networks/default"
+
+	networkInterface := &computepb.NetworkInterface{
+		AccessConfigs: []*computepb.AccessConfig{
+			{Type: &networkType, Name: &networkName},
+		},
+		Network: &network,
+	}
+
+	resource := &computepb.Instance{
+		Name:              &instanceName,
+		MachineType:       &machineType,
+		Disks:             []*computepb.AttachedDisk{disk},
+		NetworkInterfaces: []*computepb.NetworkInterface{networkInterface},
+	}
+
+	req := &computepb.InsertInstanceRequest{
+		Project:          config.ProjectId,
+		Zone:             zone,
+		InstanceResource: resource,
+	}
+
+	response, err := client.Insert(ctx, req)
+	if err != nil {
+
+		log.Fatalf("Error creating instances: %s", err)
+		return
+	}
+
+	log.Println(response)
+}
+
 // List all the active instances in a zone
 func ListInstances(zone string) {
 	ctx := context.Background()
@@ -50,37 +117,4 @@ func ListInstances(zone string) {
 
 		fmt.Printf("%s %s\n", instances.GetName(), instances.GetMachineType())
 	}
-}
-
-func ListZones() {
-	ctx := context.Background()
-
-	zonesClient, err := compute.NewZonesRESTClient(ctx)
-
-	if err != nil {
-		log.Fatalf("Failed to create zones client: %s", err)
-	}
-
-	defer zonesClient.Close()
-
-	req := &computepb.ListZonesRequest{
-		Project: config.ProjectId,
-	}
-
-	it := zonesClient.List(ctx, req)
-	fmt.Println("Available zones:")
-	for {
-		zone, err := it.Next()
-
-		if err == iterator.Done {
-			break
-		}
-
-		if err != nil {
-			log.Fatalf("Failed to fetch zone: %s", err)
-		}
-
-		fmt.Printf("- %s (%s)\n", zone.GetName(), zone.GetStatus())
-	}
-
 }
