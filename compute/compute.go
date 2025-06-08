@@ -11,39 +11,56 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-func DeleteInstance(name, zone string) {
+// Compute client
+type Client struct {
+	context         context.Context
+	instancesClient *compute.InstancesClient
+}
+
+func NewClient() (Client, error) {
 	ctx := context.Background()
+	instancesClient, err := compute.NewInstancesRESTClient(ctx)
 
-	client, err := compute.NewInstancesRESTClient(ctx)
 	if err != nil {
-		fmt.Printf("NewInstancesRESTClient error: %s", err)
+		return Client{}, err
 	}
-	defer client.Close()
 
+	client := Client{
+		context:         ctx,
+		instancesClient: instancesClient,
+	}
+
+	return client, err
+}
+
+func (c *Client) DeleteInstance(name, zone string) {
 	req := &computepb.DeleteInstanceRequest{
 		Project:  config.ProjectId,
 		Zone:     zone,
 		Instance: name,
 	}
 
-	op, err := client.Delete(ctx, req)
+	op, err := c.instancesClient.Delete(c.context, req)
 	if err != nil {
 		log.Fatalf("Error deleting client: %s", err)
 	}
 
-	op.Wait(ctx)
+	op.Wait(c.context)
 }
 
-func InsertInstance(name, zone string) {
-	ctx := context.Background()
-
-	client, err := compute.NewInstancesRESTClient(ctx)
-	if err != nil {
-		fmt.Printf("NewInstancesRESTClient error: %s", err)
+// Deletes an instance without waiting for the operation
+// to complete.
+func (c *Client) DeleteInstanceAsync(name, zone string) (*compute.Operation, error) {
+	req := &computepb.DeleteInstanceRequest{
+		Project:  config.ProjectId,
+		Zone:     zone,
+		Instance: name,
 	}
 
-	defer client.Close()
+	return c.instancesClient.Delete(c.context, req)
+}
 
+func (c *Client) InsertInstance(name, zone string) {
 	machineType := fmt.Sprintf("zones/%s/machineTypes/e2-micro", zone)
 	autoDelete := true
 	boot := true
@@ -86,34 +103,26 @@ func InsertInstance(name, zone string) {
 		InstanceResource: resource,
 	}
 
-	op, err := client.Insert(ctx, req)
+	op, err := c.instancesClient.Insert(c.context, req)
 	if err != nil {
 
 		log.Fatalf("Error creating instances: %s", err)
 		return
 	}
 
-	op.Wait(ctx)
+	op.Wait(c.context)
 }
 
 // List all the active instances in a zone
-func ListInstances(zone string) ([]*computepb.Instance, error) {
-	ctx := context.Background()
+func (c *Client) ListInstances(zone string) ([]*computepb.Instance, error) {
 	fmt.Println("Creating client")
-
-	instancesClient, err := compute.NewInstancesRESTClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	defer instancesClient.Close()
 
 	req := &computepb.ListInstancesRequest{
 		Project: config.ProjectId,
 		Zone:    zone,
 	}
 
-	it := instancesClient.List(ctx, req)
+	it := c.instancesClient.List(c.context, req)
 
 	var instances []*computepb.Instance
 
@@ -131,4 +140,9 @@ func ListInstances(zone string) ([]*computepb.Instance, error) {
 	}
 
 	return instances, nil
+}
+
+// Close the client and it's resources
+func (c *Client) Close() {
+	c.instancesClient.Close()
 }
