@@ -11,11 +11,30 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-func DeleteInstance() {
+func DeleteInstance(name, zone string) {
+	ctx := context.Background()
 
+	client, err := compute.NewInstancesRESTClient(ctx)
+	if err != nil {
+		fmt.Printf("NewInstancesRESTClient error: %s", err)
+	}
+	defer client.Close()
+
+	req := &computepb.DeleteInstanceRequest{
+		Project:  config.ProjectId,
+		Zone:     zone,
+		Instance: name,
+	}
+
+	op, err := client.Delete(ctx, req)
+	if err != nil {
+		log.Fatalf("Error deleting client: %s", err)
+	}
+
+	op.Wait(ctx)
 }
 
-func InsertInstance(zone string) {
+func InsertInstance(name, zone string) {
 	ctx := context.Background()
 
 	client, err := compute.NewInstancesRESTClient(ctx)
@@ -25,7 +44,6 @@ func InsertInstance(zone string) {
 
 	defer client.Close()
 
-	instanceName := "my-instance"
 	machineType := fmt.Sprintf("zones/%s/machineTypes/e2-micro", zone)
 	autoDelete := true
 	boot := true
@@ -56,7 +74,7 @@ func InsertInstance(zone string) {
 	}
 
 	resource := &computepb.Instance{
-		Name:              &instanceName,
+		Name:              &name,
 		MachineType:       &machineType,
 		Disks:             []*computepb.AttachedDisk{disk},
 		NetworkInterfaces: []*computepb.NetworkInterface{networkInterface},
@@ -68,24 +86,24 @@ func InsertInstance(zone string) {
 		InstanceResource: resource,
 	}
 
-	response, err := client.Insert(ctx, req)
+	op, err := client.Insert(ctx, req)
 	if err != nil {
 
 		log.Fatalf("Error creating instances: %s", err)
 		return
 	}
 
-	log.Println(response)
+	op.Wait(ctx)
 }
 
 // List all the active instances in a zone
-func ListInstances(zone string) {
+func ListInstances(zone string) ([]*computepb.Instance, error) {
 	ctx := context.Background()
 	fmt.Println("Creating client")
 
 	instancesClient, err := compute.NewInstancesRESTClient(ctx)
 	if err != nil {
-		fmt.Printf("NewInstancesRESTClient error: %s", err)
+		return nil, err
 	}
 
 	defer instancesClient.Close()
@@ -95,26 +113,22 @@ func ListInstances(zone string) {
 		Zone:    zone,
 	}
 
-	fmt.Println("Fetching instances")
 	it := instancesClient.List(ctx, req)
-	count := it.PageInfo().Remaining()
 
-	if count == 0 {
-		fmt.Println("No instances found in zone")
-		return
-	}
+	var instances []*computepb.Instance
 
 	for {
-		instances, err := it.Next()
+		instance, err := it.Next()
 		if err == iterator.Done {
 			break
 		}
 
 		if err != nil {
-			fmt.Printf("Iter err: %s", err)
-			break
+			return nil, err
 		}
 
-		fmt.Printf("%s %s\n", instances.GetName(), instances.GetMachineType())
+		instances = append(instances, instance)
 	}
+
+	return instances, nil
 }
