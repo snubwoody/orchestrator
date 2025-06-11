@@ -11,6 +11,29 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+type Instance struct {
+	Name         string
+	CanIpForward string
+	// An optional description of this instance
+	Description        string
+	DeletionProtection bool
+	// Disks associated with this instance
+	Disks       []string
+	MachineType string
+}
+
+type Disk struct {
+	// Specifies the type of disk, either "SCRATCH" or "PERSISTENT"
+	Type string
+	// The mode in which this disk is attached, either "READ_WRITE" or "READ_ONLY"
+	Mode string
+	// Indicates that this is the boot disk
+	Bool bool
+	// Specifies whether the disk will be deleted when the instance is deleted
+	AutoDelete bool
+	DiskSizeGb int64
+}
+
 // Compute client
 type Client struct {
 	context         context.Context
