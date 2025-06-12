@@ -1,0 +1,8 @@
+compute:
+  my-instance:
+    can-ip-forward: true
+    deletion-protection: true
+    description: My description
+    size: 10GB
+    disk:
+      family: debian

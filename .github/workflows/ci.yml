@@ -1,0 +1,23 @@
+name: CI
+on:
+  pull_request: 
+    branches: ["main"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          service_account: ${{secrets.SERVICE_ACCOUNT}}
+          workload_identity_provider: ${{secrets.WORKLOAD_IDENTITY_POOL}}
+      - uses: actions/setup-go@v5  
+        with:
+          go-version: '1.23.x'
+      - name: Install deps
+        run: go get .
+      - name: Run tests
+        run: go test ./...
