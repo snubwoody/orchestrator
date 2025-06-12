@@ -1,6 +1,68 @@
 mod error;
+pub mod compute;
+
 use reqwest::Client;
 use serde::{Serialize,Deserialize};
+use serde_json::Value;
+pub use error::{Error, Result};
+
+/// A client for interfacing with the Google cloud api
+///
+/// # Example
+///
+/// ```
+/// use reqwest::Client;
+/// let client = Client::new();
+/// ```
+struct GPCClient{
+    client: Client,
+    access_token: String,
+}
+
+impl GPCClient {
+    fn new() -> crate::Result<Self>{
+        let client = Client::new();
+        let access_token = std::env::var("ACCESS_TOKEN")?;
+
+        Ok(Self{
+            client: client,
+            access_token
+        })
+    }
+
+    async fn list_instances(&self,project: &str,zone:&str) -> crate::Result<()> {
+        let url = format!(
+            "https://compute.googleapis.com/compute/v1/projects/{project}/zones/{zone}/instances"
+        );
+
+        let response = self.client.get(&url)
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+
+        let body: Value = response.json().await?;
+        dbg!(body);
+        Ok(())
+    }
+
+    async fn insert_instance(&self,project: &str,zone: &str){
+
+        let url = format!(
+            "https://compute.googleapis.com/compute/v1/projects/{project}/zones/{zone}/instances"
+        );
+
+        let client = Client::new();
+        let instance = Instance::default();
+        let response = client.post(url)
+            .bearer_auth(self.access_token)
+            .json(&instance)
+            .send()
+            .await
+            .unwrap();
+        let body: serde_json::Value = response.json().await.unwrap();
+        dbg!(body);
+    }
+}
 
 // TODO check the rules about the name
 #[derive(Debug,Serialize,Deserialize,Default)]
@@ -23,10 +85,10 @@ pub struct Disk{
     mode: DiskMode,
     /// Indicates whether this is the boot disk
     boot: bool,
-    /// Specifies whether the disk will be delete when the instance is deleted
+    /// Specifies whether the disk will be deleted when the instance is deleted
     auto_delete: bool,
     /// The disk size in GB
-    disk_size: i64
+    disk_size: i64,
 }
 
 #[derive(Debug,Serialize,Deserialize)]
@@ -49,28 +111,19 @@ enum DiskMode{
     ReadOnly
 }
 
-
-async fn insert_instance(project: &str,zone: &str){
-    let url = format!(
-        "https://compute.googleapis.com/compute/v1/projects/{project}/zones/{zone}/instances"
-    );
-
-    let client = Client::new();
-    let instance = Instance::default();
-    let response = client.post(url).json(&instance).send().await.unwrap();
-    let body: serde_json::Value = response.json().await.unwrap();
-    dbg!(body);
-}
-
-
 #[cfg(test)]
-mod tests{ 
+mod tests{
+    use dotenv::dotenv;
     use super::*;
     use toml::{toml, Value};
+    use crate::compute::Zone;
 
     #[tokio::test]
-    async fn send_reqwest(){
-        insert_instance("", "").await;
+    async fn list_instances() -> Result<()> {
+        let _ = dotenv();
+        let client = GPCClient::new()?;
+        client.list_instances("orchestrator-462314", Zone::AsiaEast1A.as_str()).await?;
+        Ok(())
     }
 
     #[test]
