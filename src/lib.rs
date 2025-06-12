@@ -1,3 +1,4 @@
+mod error;
 use reqwest::Client;
 use serde::{Serialize,Deserialize};
 
