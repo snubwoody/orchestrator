@@ -1,7 +1,8 @@
+use reqwest::Client;
 use serde::{Serialize,Deserialize};
 
 // TODO check the rules about the name
-#[derive(Debug,Serialize,Deserialize)]
+#[derive(Debug,Serialize,Deserialize,Default)]
 #[serde(rename_all="kebab-case")]
 pub struct Instance{
     name: String,
@@ -48,11 +49,28 @@ enum DiskMode{
 }
 
 
+async fn insert_instance(project: &str,zone: &str){
+    let url = format!(
+        "https://compute.googleapis.com/compute/v1/projects/{project}/zones/{zone}/instances"
+    );
+
+    let client = Client::new();
+    let instance = Instance::default();
+    let response = client.post(url).json(&instance).send().await.unwrap();
+    let body: serde_json::Value = response.json().await.unwrap();
+    dbg!(body);
+}
+
 
 #[cfg(test)]
 mod tests{ 
     use super::*;
     use toml::{toml, Value};
+
+    #[tokio::test]
+    async fn send_reqwest(){
+        insert_instance("", "").await;
+    }
 
     #[test]
     fn parse_instance_toml(){
